@@ -2,6 +2,11 @@ from stanfordcorenlp import StanfordCoreNLP
 import re
 import MeCab
 
+from sudachipy import tokenizer
+from sudachipy import dictionary
+from sudachipy import config
+import json
+
 
 class StanfordCoreNlpTokenizer(object):
     """Tokenizer for English using Stanford CoreNLP for tokenization.
@@ -117,5 +122,34 @@ class MecabTokenizer(object):
             return "形"
         elif (pos == "名詞"):
             return "名"
+        else:
+            return "他"
+
+class SudachiTokunizer(object):
+    """
+    tokenizer using Sudachi
+    """
+    def __init__(self):
+        config.SETTINGFILE = "/home/takashi_ssk1029/SudachiPy/resources/sudachi.json"
+        with open(config.SETTINGFILE, "r", encoding="utf-8") as f:
+            settings = json.load(f)
+        self.tokenizer = dictionary.Dictionary(settings).create()
+        self.mode = self.tokenizer.Tokenizer.SplitMode.C
+    
+    def tokenize(self, sentence, pos_filter=["名詞", "形容詞"]):
+        tokens = [morph for morph in self.tokenizer.tokenize(self.mode, sentence)]
+        pos_tags = [self._anonymize_pos(morph) for morph in tokens]
+        pattern = r"形*名+"
+        iterator = re.finditer(pattern, "".join(pos_tags))
+        phrases = filter(lambda x: len(x) <=3, [[token.surface for token in tokens[match.start():match.end()]] for match in iterator])
+        phrases = ["_".join(phrase) for phrase in phrases]
+        return [token.surface for token in tokens[1] in pos_filter], phrases
+
+
+    def _anonymize_pos(self, morph):
+        if morph.part_of_speech[0] == "名詞" and not morph.part_of_speech[1] in ["記号","数詞"]:
+            return "名"
+        elif morph.part_of_speech[0] == "形容詞":
+            return "形"
         else:
             return "他"
